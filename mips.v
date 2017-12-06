@@ -1,3 +1,26 @@
+module MuxRegDst (z,x,b,sel);
+output reg [4:0] z;
+input [4:0] x;
+input [4:0] b;
+input sel;
+always @ (x or b or sel)
+begin
+
+if (sel==0)
+begin
+z=x;
+end
+else if (sel==1)
+begin
+z=b;
+end
+else
+begin
+z=1'bx;
+end
+end
+endmodule
+
 
 module Mux2to1 (z, x, b,sel);
 output reg [31:0] z;
@@ -22,10 +45,10 @@ end
 end
 endmodule
 
-module ALU (A,B,op,mode,overflow,Result,shiftamt);
+module ALU (A,B,op,mode,Result,shiftamt,zero);
 
 output wire [31:0] Result;
-output wire overflow;
+output wire zero;
 input wire [31:0] A,B;
 input wire [3:0] op;
 input wire [31:0] shiftamt;
@@ -39,10 +62,10 @@ assign Result = (op==0)? (A+B) : (op==1)? (A-B) :(op==2) ? A&B :
 (op==5) ? A>>shiftamt : (op==6) ? $signed (A)>>>shiftamt :
 (op==7 && A>B) ? 1: (op==8 && A<B) ? 1: 0;
 
-assign overflow = (mode==1'b1 && op==0 && A[31]==B[31] && Result[31]==~A[31]) |
-(mode==1'b1 && op==1 && A[31]==B_Neg[31] && Result[31]==~A[31])? 1'b1:1'b0;
+//assign overflow = (mode==1'b1 && op==0 && A[31]==B[31] && Result[31]==~A[31]) |
+//(mode==1'b1 && op==1 && A[31]==B_Neg[31] && Result[31]==~A[31])? 1'b1:1'b0;
 
-
+assign zero=(A==B)?1:0;
 
 
 endmodule
@@ -120,7 +143,7 @@ end
 endmodule
 
 
-module tbDM;
+/*module tbDM;
 reg [31:0]addr;
 reg [31:0] wrdata;
 reg memwrite, memread,clk;
@@ -154,7 +177,7 @@ begin
 clk=~clk;
 end
 endmodule
-
+*/
 
 
 //// INSTRUCTION MEMORY
@@ -185,7 +208,7 @@ endmodule
 
 
 
-module testInsMem();
+/*module testInsMem();
 reg [31:0]Add;
 wire [31:0]Ins;
 reg clk;
@@ -210,7 +233,7 @@ Add<=1;
 end
 InstructionMemory MyTest(Add,Ins,clk);
 endmodule 
-
+*/
 
 
 
@@ -327,7 +350,7 @@ endmodule
 
 
 
-
+/*
 module TB_CONTROL();
 reg clk;
 reg [31:0] instruction;
@@ -359,7 +382,7 @@ control a(instruction,memwrite,memread,wen,regdst,memtoreg,aluop,alusrc,pc_contr
 
 
 endmodule
-
+*/
 
 
 
@@ -382,7 +405,7 @@ endmodule
 
 
 
-module TB_SI;
+/*module TB_SI;
 
 reg [15:0] in ;
 wire [31:0] out;
@@ -398,7 +421,7 @@ end
 
 signextend a(in ,out);
 endmodule
-
+*/
 
 
 
@@ -435,7 +458,7 @@ always @(posedge clk or posedge rst)
 endmodule
 
 
-
+/*
 module TB_PC;
 reg clk,rst,pc_control;
 reg [15:0] branch_offset;
@@ -466,4 +489,104 @@ end
 
 program_counter a(clk,rst,pc,pc_control,branch_offset);
 endmodule
+*/
+
+//////  CPU MODULE 
+
+module cpu();
+reg clk,rst;
+wire [31:0]instruction;
+wire [31:0]  data1_to_A;
+wire [31:0] Reg_data2_to_AluSrcMux;
+wire [31:0] AluSrcMux_to_B;
+wire [31:0] Sextend_out;
+wire [4:0] RegDest_mux_to_wrreg;
+wire [31:0] ALUout_to_Mem_Addess;
+wire [31:0] DataMem_redata_to_Mux3;
+wire [31:0] MemtoRegMuxout_to_RegFilewdata;
+wire [31:0] pc_to_InstMem;
+wire memwrite,memread,wen,regdst,memtoreg,alusrc,pc_control;
+wire [3:0]aluop;
+wire zero;
+wire pc_control_to_pcmodule;
+assign pc_control_to_pcmodule= zero & pc_control;
+Mux2to1 ALUSRC(AluSrcMux_to_B, Reg_data2_to_AluSrcMux, Sextend_out,alusrc);
+MuxRegDst RegDstMux (RegDest_mux_to_wrreg, instruction[20:16], instruction[15:11],regdst);
+Mux2to1 Mem_to_reg (MemtoRegMuxout_to_RegFilewdata, ALUout_to_Mem_Addess,DataMem_redata_to_Mux3 ,memtoreg);
+ALU a(data1_to_A,AluSrcMux_to_B,aluop,ALUout_to_Mem_Addess,instruction[10:6],zero);
+RegFile b(clk, instruction[25:21],instruction [20:16], RegDest_mux_to_wrreg, MemtoRegMuxout_to_RegFilewdata, wen, data1_to_A,  Reg_data2_to_AluSrcMux);
+Data_Memory t(ALUout_to_Mem_Addess, Reg_data2_to_AluSrcMux, memwrite, memread, DataMem_redata_to_Mux3, clk);
+InstructionMemory c(pc_to_InstMem, instruction,clk);
+control d(instruction,memwrite,memread,wen,regdst,memtoreg,aluop,alusrc,pc_control,clk);
+signextend e(instruction[15:0] ,Sextend_out);
+program_counter f(clk,rst,pc_to_InstMem,pc_control_to_pcmodule,instruction[15:0]);
+
+always
+begin
+#10 clk =~clk;
+end
+
+initial
+begin
+$monitor($time,"   %h     %h     %h     %h    %h",pc_to_InstMem,ALUout_to_Mem_Addess,data1_to_A,Reg_data2_to_AluSrcMux,aluop);
+clk<=0;
+rst<=1;
+#4
+rst<=0;
+
+
+end
+
+
+
+endmodule
+
+//////// Register Files Module
+
+module RegisterFiles (Instruction,pc,ReadData1,ReadData2,SignEx_out,ALUresult,zero,MuxRegDest,DataMem_Redata,MuxMem_to_reg_out1,MuxMem_to_reg_out2,clk);
+input [31:0]Instruction;
+input [31:0]pc;
+input [31:0]ReadData1;
+input [31:0]ReadData2;
+input [31:0]SignEx_out;
+input [31:0]ALUresult;
+input zero;
+input [4:0]MuxRegDest;
+input [31:0]DataMem_Redata;
+output [31:0]MuxMem_to_reg_out1;
+output [31:0]MuxMem_to_reg_out2;
+input clk;
+
+output reg[31:0] IFIDinst;
+output reg[31:0] IDEXredata1;
+output reg[31:0] IDEXredata2;
+output reg[31:0] IDEXSextend_out;
+output reg[31:0] IDEXrd;
+output reg[31:0] IDEXrt;
+output reg EXMEMzero;
+output reg[31:0] EXMEMALUout;
+output reg[31:0] EXMEMredata2;
+output reg[31:0] EXMEMregdst_Mux_Out;
+output reg[31:0] MEMWBdatamem_redata;
+output reg[31:0] MEMWBdatamem_address;
+output reg[31:0] MEMWBregdst_Mux_Out;
+
+always @(negedge clk)
+begin 
+IFIDinst=Instruction;
+IDEXrt=Instruction[20:16];
+IDEXrd=Instruction[15:11];
+IDEXredata1=ReadData1;
+IDEXredata2<=ReadData2;
+IDEXSextend_out=SignEx_out;
+EXMEMzero=zero;
+EXMEMALUout<=ALUresult;
+EXMEMredata2<=IDEXredata2;
+EXMEMregdst_Mux_Out=MuxRegDest;
+MEMWBdatamem_redata=DataMem_Redata;
+MEMWBdatamem_address<=EXMEMALUout;
+end
+
+endmodule
+
 
