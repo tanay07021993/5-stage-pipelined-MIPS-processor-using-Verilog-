@@ -45,23 +45,23 @@ end
 end
 endmodule
 
-module ALU (A,B,op,mode,Result,shiftamt,zero);
+module ALU (A,B,op,Result,shiftamt,zero);
 
-output wire [31:0] Result;
+output reg [31:0] Result;
 output wire zero;
 input wire [31:0] A,B;
 input wire [3:0] op;
-input wire [31:0] shiftamt;
-input mode;
+input wire [4:0] shiftamt;
 wire [31:0] B_Neg;
 
 assign B_Neg= -B;
-
+always @(op)
+begin
 assign Result = (op==0)? (A+B) : (op==1)? (A-B) :(op==2) ? A&B :
 (op==3) ? A|B : (op==4) ? A<<shiftamt:
 (op==5) ? A>>shiftamt : (op==6) ? $signed (A)>>>shiftamt :
 (op==7 && A>B) ? 1: (op==8 && A<B) ? 1: 0;
-
+end
 //assign overflow = (mode==1'b1 && op==0 && A[31]==B[31] && Result[31]==~A[31]) |
 //(mode==1'b1 && op==1 && A[31]==B_Neg[31] && Result[31]==~A[31])? 1'b1:1'b0;
 
@@ -79,6 +79,14 @@ integer wreg,read1,read2;
 
 reg [31:0] A [0:31];
 
+integer i;
+initial
+begin
+	for(i=0;i<32;i=i+1)  //////////// initiating the regitser file with values
+begin
+A[i]=i;
+end
+end
 always @ (posedge clk)
 begin
 if (wen==1)
@@ -199,7 +207,7 @@ integer i;
 
 initial
 begin
-$readmemh("Processor Project.txt",InsMem);
+$readmemb("Processor Project.txt",InsMem);
 end
 
 
@@ -248,7 +256,7 @@ endmodule
 module control(instruction,memwrite,memread,wen,regdst,memtoreg,aluop,alusrc,pc_control,clk);
 
 output reg memwrite,memread,wen,regdst,memtoreg,alusrc,pc_control ;
-output reg [2:0]aluop;
+output reg [3:0]aluop;
 
 input 	[31:0]	instruction;
 input clk;
@@ -257,7 +265,7 @@ wire [5:0] op,funct;
 assign op = instruction[31:26];
 assign funct = instruction[5:0];
 
-always @(posedge clk)
+always @(instruction)
 begin
 
 
@@ -270,7 +278,7 @@ regdst=1'b0;
 memtoreg=1'b0;
 alusrc=1'b1;
 pc_control=1'b0;
-aluop=3'b000;
+aluop=4'b0000;
 end 
 
 
@@ -285,7 +293,7 @@ regdst<=1'b0;
 memtoreg<=1'b1;
 alusrc<=1'b1;
 pc_control<=1'b0;
-aluop<=3'b000;
+aluop<=4'b0000;
 end
 
 
@@ -304,22 +312,22 @@ pc_control=1'b0;
 
 // ADD
 if(funct == 6'h20)begin
-aluop=3'b000;end
+aluop=4'b0000;end
 //SUB
 else if (funct == 6'h22)begin
-aluop=3'b001;end
+aluop=4'b0001;end
 //AND
 else if (funct == 6'h24)begin
-aluop=3'b010;end
+aluop=4'b0010;end
 //OR
 else if (funct == 6'h25)begin
-aluop=3'b011;end
+aluop=4'b011;end
 //SLL
 else if (funct == 6'h0)begin
-aluop=3'b100;end
+aluop=4'b0100;end
 //SRL
 else if (funct == 6'h02)begin
-aluop=3'b101;end
+aluop=4'b0101;end
 
 end
 
@@ -510,6 +518,8 @@ wire [3:0]aluop;
 wire zero;
 wire pc_control_to_pcmodule;
 assign pc_control_to_pcmodule= zero & pc_control;
+	
+	
 Mux2to1 ALUSRC(AluSrcMux_to_B, Reg_data2_to_AluSrcMux, Sextend_out,alusrc);
 MuxRegDst RegDstMux (RegDest_mux_to_wrreg, instruction[20:16], instruction[15:11],regdst);
 Mux2to1 Mem_to_reg (MemtoRegMuxout_to_RegFilewdata, ALUout_to_Mem_Addess,DataMem_redata_to_Mux3 ,memtoreg);
@@ -543,7 +553,7 @@ endmodule
 
 //////// Register Files Module
 
-module PipelineRegisters(Instruction,pc,ReadData1,ReadData2,SignEx_out,ALUresult,zero,MuxRegDest,DataMem_Redata,MuxMem_to_reg_out1,MuxMem_to_reg_out2,clk);
+module PipelineRegisters(Instruction,pc,ReadData1,ReadData2,SignEx_out,ALUresult,zero,MuxRegDest,DataMem_Redata,MuxMem_to_reg_out1,MuxMem_to_reg_out2,clk,IFIDinst,IDEXredata1,IDEXredata2,IDEXSextend_out,IDEXrd,IDEXrt,EXMEMzero,EXMEMALUout,EXMEMredata2,EXMEMregdst_Mux_Out,MEMWBdatamem_redata,MEMWBdatamem_address,MEMWBregdst_Mux_Out);
 input [31:0]Instruction;
 input [31:0]pc;
 input [31:0]ReadData1;
