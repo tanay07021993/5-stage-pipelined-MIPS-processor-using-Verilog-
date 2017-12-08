@@ -543,7 +543,7 @@ endmodule
 
 //////// Register Files Module
 
-module RegisterFiles (Instruction,pc,ReadData1,ReadData2,SignEx_out,ALUresult,zero,MuxRegDest,DataMem_Redata,MuxMem_to_reg_out1,MuxMem_to_reg_out2,clk);
+module PipelineRegisters(Instruction,pc,ReadData1,ReadData2,SignEx_out,ALUresult,zero,MuxRegDest,DataMem_Redata,MuxMem_to_reg_out1,MuxMem_to_reg_out2,clk);
 input [31:0]Instruction;
 input [31:0]pc;
 input [31:0]ReadData1;
