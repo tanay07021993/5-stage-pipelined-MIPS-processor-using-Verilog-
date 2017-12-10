@@ -385,13 +385,16 @@ endmodule
 ////  SIGN EXTEND
 
 
-module signextend(in ,out);
+module signextend(in ,out,clk);
 input [15:0] in ;
-output [31:0] out ;
+output reg [31:0] out ;
 //parameter input_width =16 ,output_width=32;
 localparam sign_bit_location=15;
 localparam sign_bit_replication_count=16;
-assign out ={{sign_bit_replication_count{in[sign_bit_location]}},in[15:0]};
+always@ (posedge clk)
+begin
+out ={{sign_bit_replication_count{in[sign_bit_location]}},in[15:0]};
+end
 endmodule
 
 
@@ -637,7 +640,7 @@ program_counter f(clk,rst,pc_to_InstMem,pc_control_to_pcmodule,instruction[15:0]
 
 InstructionMemory c(pc_to_InstMem,instruction,clk);
 RegFile b(clk, IFIDinst[25:21],IFIDinst [20:16], MEMWBwrite_register, MEMWBregdst_Mux_Out, MEMWBctrl[2],data1_to_A,  Reg_data2_to_AluSrcMux);
-signextend e(IFIDinst[15:0] ,IDEXSextend_out);
+	signextend e(IFIDinst[15:0] ,IDEXSextend_out,clk);
 
 
 Mux2to1 ALUSRC(AluSrcMux_to_B, IDEXredata2, IDEXSextend_out,IDEXctrl[5]);
