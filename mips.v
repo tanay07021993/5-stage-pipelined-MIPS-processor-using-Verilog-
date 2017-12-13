@@ -61,8 +61,7 @@ assign B_Neg= -B;
 always @(posedge clk)
 begin
 assign Result = (op==0)? (A+B) : (op==1)? (A-B) :(op==2) ? A&B :
-(op==3) ? A|B : (op==4) ? A<<shiftamt:
-(op==5) ? A>>shiftamt : (op==6) ? $signed (A)>>>shiftamt :
+(op==3) ? A|B : (op==4) ? B<<shiftamt: (op==5) ? B>>shiftamt : (op==6) ? $signed (A)>>>shiftamt :
 (op==7 && A>B) ? 1: (op==8 && A<B) ? 1: 0;
 end
 //assign overflow = (mode==1'b1 && op==0 && A[31]==B[31] && Result[31]==~A[31]) |
@@ -93,18 +92,18 @@ always @ (posedge clk)
 begin
 if (wen==1)
 begin
-wreg=wr;
-A[wreg]<=wdata;
-read1=rr1;
-read2=rr2;
+//wreg=wr;
+//A[wreg]<=wdata;
+//read1=rr1;
+//read2=rr2;
 data1<=A[read1];
 data2<=A[read2];
 end
 
 else if (wen==0)
 begin
-read1=rr1;
-read2=rr2;
+//read1=rr1;
+//read2=rr2;
 data1<=A[read1];
 data2<=A[read2];
 end
@@ -114,6 +113,32 @@ data1=1'bz;
 data2=1'bz;
 
 end
+always @ (negedge clk)
+begin
+if (wen==1)
+begin
+wreg=wr;
+A[wreg]<=wdata;
+read1=rr1;
+read2=rr2;
+//data1<=A[read1];
+//data2<=A[read2];
+end
+
+else if (wen==0)
+begin
+read1=rr1;
+read2=rr2;
+//data1<=A[read1];
+//data2<=A[read2];
+end
+
+//else
+//data1=1'bz;
+//data2=1'bz;
+end
+
+
 always @*
 begin
 read1=rr1;
@@ -429,8 +454,8 @@ module program_counter(clk,rst,pc,pc_control,branch_offset);
 input clk,rst,pc_control;
 input [15:0] branch_offset;
 output reg[31:0]pc;
-//wire [31:0] pc_plus_4;
-//assign pc_plus_4=pc+4;
+wire [31:0] pc_plus_4;
+assign pc_plus_4=pc+4;
 always @(posedge clk or posedge rst)
 	begin
 		if (rst)
@@ -441,8 +466,8 @@ always @(posedge clk or posedge rst)
 		begin
 			case(pc_control)
 					//1'b0 : pc<= pc_plus_4;
-					//1'b1 : pc<= pc_plus_4 + { {14{branch_offset[15]}} , branch_offset[15:0] , 2'b00 };
-					1'b1 : pc<= pc + branch_offset*4;
+					1'b1 : pc<= pc_plus_4 + { {14{branch_offset[15]}} , branch_offset[15:0] , 2'b00 };
+					//1'b1 : pc<= pc + branch_offset*4;
 					default : pc<= pc+4;
 			endcase
 
@@ -531,7 +556,7 @@ endmodule
 
 //
 
-module RegisterFiles (memwrite, memread,wen,regdst,memtoreg,alusrc,pc_control,aluop,IDEXctrl,EXMEMctrl,MEMWBctrl,Instruction,ReadData1,ReadData2,SignEx_out,ALUresult,zero,MuxRegDest,DataMem_Redata,MuxMem_to_reg_out1,MuxMem_to_reg_out2,clk,IFIDinst,IDEXinst,EXMEMinst,IDEXredata1,IDEXredata2,IDEXSextend_out,EXMEMzero,EXMEMALUout,EXMEMredata2,EXMEMregdst_Mux_Out,MEMWBwrite_register,MEMWBdatamem_redata,MEMWBdatamem_address);
+module RegisterFiles (memwrite, memread,wen,regdst,memtoreg,alusrc,pc_control,aluop,IDEXctrl,EXMEMctrl,MEMWBctrl,Instruction,ReadData1,ReadData2,SignEx_out,ALUresult,zero,MuxRegDest,DataMem_Redata,MuxMem_to_reg_out1,MuxMem_to_reg_out2,clk,IFIDinst,IDEXinst,EXMEMinst,MEMWBinst,IDEXredata1,IDEXredata2,IDEXSextend_out,EXMEMzero,EXMEMALUout,EXMEMredata2,EXMEMregdst_Mux_Out,MEMWBwrite_register,MEMWBdatamem_redata,MEMWBdatamem_address);
 input [31:0]Instruction;
 input [31:0]ReadData1;
 input [31:0]ReadData2;
@@ -569,10 +594,19 @@ output reg[31:0] EXMEMredata2;
 output reg[4:0] EXMEMregdst_Mux_Out;
 
 
+output reg[31:0]MEMWBinst;
 output reg [10:0] MEMWBctrl;
 output reg[4:0] MEMWBwrite_register;
 output reg[31:0] MEMWBdatamem_redata;
 output reg[31:0] MEMWBdatamem_address;
+
+if (MEMWBdatamem_redata==)
+begin
+
+
+end
+
+
 
 always @(posedge clk)
 begin
@@ -592,10 +626,27 @@ begin
 ///IFID Register
 IFIDinst<=Instruction;
 
+///IDEX Register
+IDEXinst<=IFIDinst;
+IDEXredata1<=ReadData1;
+IDEXredata2<=ReadData2;
+IDEXSextend_out<=SignEx_out;
 
-//MEMWBinst<=EXMEMinst;
-//IDEXrt<=ReadData2;
-//IDEXrd<=ReadData1;
+///EXMEM Register
+EXMEMctrl<=IDEXctrl;
+EXMEMinst<=IDEXinst;
+EXMEMzero<=zero;
+EXMEMALUout<=ALUresult;
+EXMEMredata2<=IDEXredata2;
+EXMEMregdst_Mux_Out<=MuxRegDest;
+
+///MEMWB Register
+MEMWBctrl<=EXMEMctrl;
+MEMWBinst<=EXMEMinst;
+MEMWBwrite_register<=EXMEMregdst_Mux_Out;
+MEMWBdatamem_redata<=EXMEMredata2;
+MEMWBdatamem_address<=EXMEMALUout;
+
 
 ///IDEX Register
 IDEXinst<=IFIDinst;
@@ -613,12 +664,12 @@ EXMEMregdst_Mux_Out<=MuxRegDest;
 
 ///MEMWB Register
 MEMWBctrl<=EXMEMctrl;
+MEMWBinst<=EXMEMinst;
 MEMWBwrite_register<=EXMEMregdst_Mux_Out;
 MEMWBdatamem_redata<=EXMEMredata2;
 MEMWBdatamem_address<=EXMEMALUout;
 
 end
-
 endmodule
 
 
@@ -649,7 +700,7 @@ wire pc_control_to_pcmodule;
 wire [31:0]IFIDinst;
 
 
-//wire [31:0]MEMWBinst;
+
 
 ///IDEX Wires
 wire [31:0]IDEXinst;
@@ -669,6 +720,7 @@ wire [4:0]EXMEMregdst_Mux_Out;
 
 ///MEMWB Wires
 wire [10:0]MEMWBctrl; 
+wire [31:0]MEMWBinst;
 wire [31:0]MEMWBdatamem_redata;
 wire [31:0]MEMWBdatamem_address;
 wire [31:0]MEMWBregdst_Mux_Out;
@@ -689,7 +741,7 @@ signextend e(IFIDinst[15:0] ,IDEXSextend_out,clk);
 
 Mux2to1 ALUSRC(AluSrcMux_to_B, IDEXredata2, IDEXSextend_out,IDEXctrl[5]);
 control d(IFIDinst,memwrite,memread,wen,regdst,memtoreg,aluop,alusrc,pc_control,clk);
-ALU a(IDEXredata1,AluSrcMux_to_B,IDEXctrl[10:7],ALUout_to_Mem_Addess,IFIDinst[10:6],zero,clk);
+ALU a(IDEXredata1,AluSrcMux_to_B,IDEXctrl[10:7],ALUout_to_Mem_Addess,IDEXinst[10:6],zero,clk);
 MuxRegDst RegDstMux (MuxRegDest, IDEXinst[20:16], IDEXinst[15:11],IDEXctrl[3]);
 Data_Memory t(EXMEMALUout, EXMEMredata2 , EXMEMctrl[0], EXMEMctrl[1], MEMWBDataMem_Redata, clk);
 Mux2to1 Mem_to_reg(MemtoRegMuxout_to_RegFilewdata, MEMWBdatamem_address,MEMWBDataMem_Redata ,MEMWBctrl[4]);
@@ -698,7 +750,7 @@ Mux2to1 Mem_to_reg(MemtoRegMuxout_to_RegFilewdata, MEMWBdatamem_address,MEMWBDat
 RegisterFiles m(memwrite, memread,wen,regdst,memtoreg,alusrc,pc_control,aluop,IDEXctrl,EXMEMctrl,MEMWBctrl,instruction,data1_to_A,
 Reg_data2_to_AluSrcMux,Sextend_out,ALUout_to_Mem_Addess,zero,
 MuxRegDest,DataMem_redata_to_Mux3,ALUout_to_Mem_Addess,MemtoRegMuxout_to_RegFilewdata,clk,
-IFIDinst,IDEXinst,EXMEMinst,IDEXredata1,IDEXredata2,IDEXSextend_out,EXMEMzero,EXMEMALUout,EXMEMredata2,EXMEMregdst_Mux_Out,
+IFIDinst,IDEXinst,EXMEMinst,MEMWBinst,IDEXredata1,IDEXredata2,IDEXSextend_out,EXMEMzero,EXMEMALUout,EXMEMredata2,EXMEMregdst_Mux_Out,
 MEMWBwrite_register,MEMWBdatamem_redata,MEMWBdatamem_address);
 
 
@@ -709,8 +761,8 @@ end
 
 initial
 begin
-$monitor($time,"     %h     %b     %d    %d   %d   ",
-pc_to_InstMem,IFIDinst,data1_to_A,  AluSrcMux_to_B,MemtoRegMuxout_to_RegFilewdata,);
+$monitor($time,"     %h     %b     %d    %d   %d   %d   %d   %d",
+pc_to_InstMem,IFIDinst,IFIDinst[25:21],IFIDinst [20:16],IDEXredata1,AluSrcMux_to_B,MEMWBwrite_register,MemtoRegMuxout_to_RegFilewdata,);
 clk<=0;
 rst<=1;
 #5
