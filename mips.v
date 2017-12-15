@@ -60,10 +60,10 @@ endmodule
 
 /*ALU a(IDEXredata1,AluSrcMux_to_B,aluop,ALUout_to_Mem_Addess,IFIDinst[10:6],zero);*/
 
-module ALU (A,B,op,Result,shiftamt,zero,clk);
+module ALU (A,B,op,Result,shiftamt,clk);
 input clk;
 output reg signed[31:0] Result;
-output wire zero;
+//output wire zero;
 input wire signed [31:0] A,B;
 input wire [3:0] op;
 input wire [4:0] shiftamt;
@@ -81,7 +81,7 @@ end
 //assign overflow = (mode==1'b1 && op==0 && A[31]==B[31] && Result[31]==~A[31]) |
 //(mode==1'b1 && op==1 && A[31]==B_Neg[31] && Result[31]==~A[31])? 1'b1:1'b0;
 
-assign zero=(A==B)?1:0;
+//assign zero=(A==B)?1:0;
 
 
 endmodule
@@ -372,7 +372,7 @@ endmodule
 
 
 //program_counter f(clk,rst,pc_to_InstMem,pc_control_to_pcmodule,instruction[15:0]);
-module program_counter(clk,rst,pc,pc_control,IDEXSextend_out,IDEX_PC);
+/*module program_counter(clk,rst,pc,pc_control,IDEXSextend_out,IDEX_PC);
 input clk,rst,pc_control;
 input [31:0] IDEXSextend_out;
 input [31:0] IDEX_PC;
@@ -397,7 +397,7 @@ always @(posedge clk or posedge rst)
 	end
 endmodule
 
-
+*/
 
 
 
@@ -411,7 +411,7 @@ MEMWB_DataMem_Redata,MEMWB_DataMem_redata,MEMWBwrite_register,MEMWBdatamem_addre
 
 input clk; 
 input [31:0] pc_to_InstMem;
- reg [31:0] IFID_PC;
+ //reg [31:0] IFID_PC;
 output reg [31:0] IDEX_PC; 
 //// CONTROL SIGNAL REGISTER
 
@@ -481,8 +481,8 @@ always @(posedge clk)
 begin
 
 
-IFID_PC<=pc_to_InstMem;
-IDEX_PC<=IFID_PC;
+//IFID_PC<=pc_to_InstMem;
+IDEX_PC<=pc_to_InstMem;
 
 
 ////// CONTROL
@@ -543,6 +543,7 @@ module cpu2();
 reg clk,rst;
 
 wire [10:0] Control_Signals;
+reg [10:0] Control_Signalsout;
 wire [10:0] IDEXctrl;
 wire [10:0] EXMEMctrl;
 wire [10:0] MEMWBctrl; 
@@ -579,16 +580,47 @@ wire signed[31:0]MEMWBdatamem_address;
 wire signed[31:0]MemtoregOut_writedata;           ////wire ben memtoreg l write data fel register file
 
 
-wire [31:0] pc_to_InstMem;
+reg [31:0] pc_to_InstMem;
 wire [31:0] IDEX_PC;
 wire pc_control_to_pcmodule;
 wire zero;
+wire [31:0] pc_plus_4;
+assign pc_plus_4=pc_to_InstMem+4;
+
+assign zero= (data1_to_A==Reg_data2_to_AluSrcMux)?1:0;
+assign pc_control_to_pcmodule= zero & Control_Signals[6];
+always @(posedge clk or posedge rst)
+	begin
+		if (rst)
+		begin
+			pc_to_InstMem <= 32'd0;
+		end
+		else
+		begin
+		case(pc_control_to_pcmodule)
+					1'b0 : pc_to_InstMem<= pc_plus_4;
+					1'b1 : pc_to_InstMem<= IDEX_PC + {Sextend_out[29:0] , 2'b00 };
+					default : pc_to_InstMem<= pc_plus_4;
+			endcase
+end
+end
+
+
+always@(IDEXctrl[6] or Control_Signals)           /// stall of branch
+begin
+if(IDEXctrl[6]==0)
+begin
+Control_Signalsout=Control_Signals;
+end
+else
+begin
+Control_Signalsout=0;
+end
+end
 
 
 
-assign pc_control_to_pcmodule= zero & IDEXctrl[6];
-
-program_counter f(clk,rst,pc_to_InstMem,pc_control_to_pcmodule,IDEXSextend_out,IDEX_PC);
+//program_counter f(clk,rst,pc_to_InstMem,pc_control_to_pcmodule,Sextend_out,IDEX_PC);
 
 InstructionMemory c(pc_to_InstMem,instruction,clk);
 RegFile b(clk, IFIDinst[25:21],IFIDinst [20:16], MEMWBwrite_register, MemtoregOut_writedata, MEMWBctrl[2],data1_to_A,  Reg_data2_to_AluSrcMux);
@@ -597,7 +629,7 @@ signextend e(IFIDinst[15:0] ,Sextend_out,clk);
 
 //control d(IFIDinst,memwrite,memread,wen,regdst,memtoreg,aluop,alusrc,pc_control,clk);
 control d(IFIDinst,Control_Signals,clk);
-ALU a(IDEXredata1,AluSrcMux_to_B,IDEXctrl[10:7],ALUout_to_Mem_Addess,IDEXinst[10:6],zero,clk);
+ALU a(IDEXredata1,AluSrcMux_to_B,IDEXctrl[10:7],ALUout_to_Mem_Addess,IDEXinst[10:6],clk);
 
 Data_Memory t(EXMEMALUout, EXMEMredata2 , EXMEMctrl[0], EXMEMctrl[1], MEMWB_DataMem_Redata, clk);
 
@@ -617,7 +649,7 @@ MEMWB_DataMem_Redata,MEMWB_DataMem_redata,MEMWBwrite_register,MEMWBdatamem_addre
 
 
 
-RegisterFiles m(pc_to_InstMem,IDEX_PC,clk,Control_Signals,IDEXctrl,EXMEMctrl,MEMWBctrl,instruction,IDEXinst,IFIDinst,data1_to_A,  Reg_data2_to_AluSrcMux,IDEXredata1,IDEXredata2,Sextend_out,IDEXSextend_out,IDEX_rd,IDEX_rt,
+RegisterFiles m(pc_to_InstMem,IDEX_PC,clk,Control_Signalsout,IDEXctrl,EXMEMctrl,MEMWBctrl,instruction,IDEXinst,IFIDinst,data1_to_A,  Reg_data2_to_AluSrcMux,IDEXredata1,IDEXredata2,Sextend_out,IDEXSextend_out,IDEX_rd,IDEX_rt,
 
 ALUout_to_Mem_Addess,EXMEMALUout,EXMEMredata2,MuxRegDest,
 
