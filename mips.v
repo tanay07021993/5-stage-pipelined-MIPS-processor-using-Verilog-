@@ -323,17 +323,7 @@ aluop=4'b0101;end
 
 end
 
-else if(op==6'hxx)
-begin
-memwrite<=1'b0;
-memread<=1'b0;
-wen<=1'b0;
-regdst<=1'b0;
-memtoreg<=1'b0;
-alusrc<=1'b0;
-pc_control<=1'b0;
-aluop<=4'b0000;
-end
+
 
 // BRANCH
 else //(op==6'h04)
@@ -434,29 +424,19 @@ endmodule
 
 
 
-module program_counter(clk,rst,pc,pc_control,branch_offset,hold);
+module program_counter(clk,rst,pc,pc_control,branch_offset);
 input clk,rst,pc_control;
 input [15:0] branch_offset;
 output reg[31:0]pc;
-input wire hold;
 //wire [31:0] pc_plus_4;
 //assign pc_plus_4=pc+4;
-/*always@(posedge clk) begin
-if (hold)begin
-pc=pc-20;
-end
-end*/
 always @(posedge clk or posedge rst)
 	begin
-		
 		if (rst)
 		begin
 			pc <= 32'd0;
 		end
-//else if (hold)begin
-//pc<=pc-12;
-//end
-else
+		else
 		begin
 			case(pc_control)
 					//1'b0 : pc<= pc_plus_4;
@@ -550,7 +530,7 @@ endmodule
 
 //
 
-module RegisterFiles (hold,memwrite, memread,wen,regdst,memtoreg,alusrc,pc_control,aluop,IDEXctrl,EXMEMctrl,MEMWBctrl,Instruction,ReadData1,ReadData2,SignEx_out,ALUresult,zero,MuxRegDest,DataMem_Redata,MuxMem_to_reg_out1,MuxMem_to_reg_out2,clk,IFIDinst,IDEXinst,EXMEMinst,MEMWBinst,IDEXredata1,IDEXredata2,IDEXSextend_out,EXMEMzero,EXMEMALUout,EXMEMredata2,EXMEMregdst_Mux_Out,MEMWBwrite_register,MEMWBdatamem_redata,MEMWBdatamem_address);
+module RegisterFiles (memwrite, memread,wen,regdst,memtoreg,alusrc,pc_control,aluop,IDEXctrl,EXMEMctrl,MEMWBctrl,Instruction,ReadData1,ReadData2,SignEx_out,ALUresult,zero,MuxRegDest,DataMem_Redata,MuxMem_to_reg_out1,MuxMem_to_reg_out2,clk,IFIDinst,IDEXinst,EXMEMinst,MEMWBinst,IDEXredata1,IDEXredata2,IDEXSextend_out,EXMEMzero,EXMEMALUout,EXMEMredata2,EXMEMregdst_Mux_Out,MEMWBwrite_register,MEMWBdatamem_redata,MEMWBdatamem_address);
 input [31:0]Instruction;
 input [31:0]ReadData1;
 input [31:0]ReadData2;
@@ -592,7 +572,6 @@ output reg [10:0] MEMWBctrl;
 output reg[4:0] MEMWBwrite_register;
 output reg[31:0] MEMWBdatamem_redata;
 output reg[31:0] MEMWBdatamem_address;
-output reg hold;
 
 always @(posedge clk)
 begin
@@ -606,19 +585,7 @@ IDEXctrl[6]<=pc_control;
 IDEXctrl[10:7]<=aluop;
 end
 
-always @(posedge clk)begin
-if(IDEXinst[20:16]==IFIDinst[20:16]&&!IDEXctrl[0]&&IDEXctrl[1])begin
-hold<=1;
-//EXMEMctrl<=0;
-IDEXctrl<=0;
-//IFIDinst<=IDEXinst;
-end
-else begin
-hold<=0;
-EXMEMctrl<=IDEXctrl;
-end
-end
-/////////////////////////////
+
 always @(posedge clk)begin
 if (MEMWBctrl[1] &&EXMEMctrl[0] && EXMEMinst[20:16]==IDEXinst[20:16] ) begin
 EXMEMredata2<=DataMem_Redata;
@@ -746,14 +713,13 @@ wire [31:0]MEMWBdatamem_address;
 wire [31:0]MEMWBregdst_Mux_Out;
 wire [4:0]MEMWBwrite_register;
 wire [31:0]MEMWBDataMem_Redata;
-wire hold;
 
 always @(posedge clk)begin
  MEMWBinstruction=MEMWBinst;
 end
 assign pc_control_to_pcmodule= zero & IDEXctrl[6];
 
-program_counter f(clk,rst,pc_to_InstMem,pc_control_to_pcmodule,EXMEMinst[15:0],hold);
+program_counter f(clk,rst,pc_to_InstMem,pc_control_to_pcmodule,EXMEMinst[15:0]);
 
 InstructionMemory c(pc_to_InstMem,instruction,clk);
 RegFile b(clk, IFIDinst[25:21],IFIDinst [20:16], MEMWBwrite_register, MemtoRegMuxout_to_RegFilewdata, MEMWBctrl[2],data1_to_A,  Reg_data2_to_AluSrcMux);
@@ -769,7 +735,7 @@ Data_Memory t(EXMEMALUout, EXMEMredata2 , EXMEMctrl[0], EXMEMctrl[1], DataMem_re
 Mux2to1 Mem_to_reg(MemtoRegMuxout_to_RegFilewdata, MEMWBdatamem_address,MEMWBdatamem_redata ,MEMWBctrl[4]);
 
 
-RegisterFiles m(hold,memwrite, memread,wen,regdst,memtoreg,alusrc,pc_control,aluop,IDEXctrl,EXMEMctrl,MEMWBctrl,instruction,data1_to_A,
+RegisterFiles m(memwrite, memread,wen,regdst,memtoreg,alusrc,pc_control,aluop,IDEXctrl,EXMEMctrl,MEMWBctrl,instruction,data1_to_A,
 Reg_data2_to_AluSrcMux,Sextend_out,ALUout_to_Mem_Addess,zero,
 MuxRegDest,DataMem_redata_to_Mux3,ALUout_to_Mem_Addess,MemtoRegMuxout_to_RegFilewdata,clk,
 IFIDinst,IDEXinst,EXMEMinst,MEMWBinst,IDEXredata1,IDEXredata2,IDEXSextend_out,EXMEMzero,EXMEMALUout,EXMEMredata2,EXMEMregdst_Mux_Out,
