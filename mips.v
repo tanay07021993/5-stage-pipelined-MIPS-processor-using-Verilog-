@@ -1,4 +1,4 @@
-module MuxRegDst (z,x,b,sel)
+module MuxRegDst (z,x,b,sel);
 output reg [4:0] z;
 input [4:0] x;
 input [4:0] b;
